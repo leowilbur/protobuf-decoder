@@ -1,0 +1,166 @@
+import React, { Fragment, useState } from "react";
+import {
+  Checkbox,
+  Container,
+  Divider,
+  Form,
+  Header,
+  TextArea,
+  Input,
+} from "semantic-ui-react";
+import { parseInput, bufferToPrettyHex } from "./hexUtils";
+import "./App.css";
+import ProtobufDisplay from "./ProtobufDisplay";
+import { decodeProto, trimToDecodable } from "./protobufDecoder";
+
+function App() {
+  const [hex, setHex] = useState("");
+  const [parseDelimited, setParseDelimited] = useState(false);
+  const [hexBuffer, setHexBuffer] = useState("");
+  const [trimOffset, setTrimOffset] = useState(0);
+  const [trimCount, setTrimCount] = useState(0);
+  const [trimHex, setTrimHex] = useState("");
+  const [autoTrim, setAutoTrim] = useState(true);
+  const [trimChars, setTrimChars] = useState(0);
+  const [maxTrimChars, setMaxTrimChars] = useState(0);
+
+  const applyDecode = b => {
+    if (autoTrim) {
+      const { buffer: t, offset: o } = trimToDecodable(b, parseDelimited);
+      setHexBuffer(t);
+      setTrimOffset(o);
+      setTrimCount(o);
+      setTrimHex(bufferToPrettyHex(b.slice(0, o)));
+    } else {
+      const bytes = Math.min(Math.floor(trimChars / 2), b.length);
+      const t = b.slice(bytes);
+      setHexBuffer(t);
+      setTrimOffset(bytes);
+      setTrimCount(bytes);
+      setTrimHex(bufferToPrettyHex(b.slice(0, bytes)));
+    }
+  };
+
+  const onHexChanged = e => {
+    const v = e.target.value;
+    setHex(v);
+    const normalized = v.replace(/\s/g, "").replace(/0x/gi, "").toLowerCase();
+    const isHexInput = normalized.length > 0 && /^[0-9a-f]+$/.test(normalized);
+    const maxChars = isHexInput ? normalized.length : 0;
+    setMaxTrimChars(maxChars);
+    let tc = trimChars;
+    if (tc > maxChars) tc = maxChars;
+    if (tc % 2) tc -= 1;
+    if (tc !== trimChars) setTrimChars(tc);
+
+    const b = parseInput(v);
+    applyDecode(b);
+  };
+
+
+
+  const fileChange = async e => {
+    const file = (e.target.files || [])[0];
+    if (file) {
+      const b = new Uint8Array(await file.arrayBuffer());
+      setHex(bufferToPrettyHex(b));
+      const max = b.length * 2;
+      setMaxTrimChars(max);
+      let tc = trimChars;
+      if (tc > max) tc = max;
+      if (tc % 2) tc -= 1;
+      if (tc !== trimChars) setTrimChars(tc);
+      applyDecode(b);
+    }
+  };
+
+  const result = hexBuffer ? (
+    <Fragment>
+      <Header as="h2">Result</Header>
+      <ProtobufDisplay value={decodeProto(hexBuffer, parseDelimited)} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
+    </Fragment>
+  ) : null;
+
+  return (
+    <Container>
+      <Header as="h1">Protobuf Decoder</Header>
+      <p>
+        Tool to decode Protobuf without having the original .proto files. All
+        decoding is done locally via JavaScript.
+      </p>
+      <Form>
+        <Form.Group>
+          <TextArea
+            placeholder="Paste Protobuf or gRPC request as hex or base64"
+            onChange={onHexChanged}
+            value={hex}
+            data-testid="input-hex"
+          />
+          <Input
+            action={{
+              icon: 'upload',
+              className: 'file-button-provider-icon',
+              onClick: () => document.querySelector('#file-input-button').click()
+            }}
+            input={{
+              id: 'file-input-button',
+              hidden: true
+            }}
+            onChange={fileChange}
+            type='file'
+          />
+        </Form.Group>
+        <Form.Group>
+          <Checkbox
+            label="parse varint length delimited input"
+            data-testid="parse-delimited-checkbox"
+            onChange={(_, data) => {
+              setParseDelimited(!!data.checked);
+              const b = parseInput(hex);
+              applyDecode(b);
+            }}
+            checked={parseDelimited}
+          />
+        </Form.Group>
+        <Form.Group>
+          <Checkbox
+            label="auto trim"
+            checked={autoTrim}
+            onChange={(_, d) => {
+              setAutoTrim(!!d.checked);
+              const b = parseInput(hex);
+              applyDecode(b);
+            }}
+          />
+          <div style={{ marginLeft: 16, flex: 1 }}>
+            <input
+              type="number"
+              min={0}
+              max={maxTrimChars}
+              step={2}
+              value={trimChars}
+              disabled={autoTrim}
+              onChange={e => {
+                let v = parseInt(e.target.value || "0", 10);
+                if (isNaN(v)) v = 0;
+                if (v % 2) v -= 1;
+                if (v < 0) v = 0;
+                if (v > maxTrimChars) v = maxTrimChars;
+                setTrimChars(v);
+                const b = parseInput(hex);
+                applyDecode(b);
+              }}
+              style={{ width: 160 }}
+            />
+            <div>Trim left chars: {trimChars} / {maxTrimChars}</div>
+          </div>
+        </Form.Group>
+
+      </Form>
+      {result}
+      <Divider />
+    </Container>
+  );
+}
+
+export default App;
