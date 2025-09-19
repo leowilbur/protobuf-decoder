@@ -11,6 +11,7 @@ import {
 import { parseInput, bufferToPrettyHex } from "./hexUtils";
 import "./App.css";
 import ProtobufDisplay from "./ProtobufDisplay";
+import ProtobufJsonView from "./ProtobufJsonView";
 import { decodeProto, trimToDecodable } from "./protobufDecoder";
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
   const [autoTrim, setAutoTrim] = useState(true);
   const [trimChars, setTrimChars] = useState(0);
   const [maxTrimChars, setMaxTrimChars] = useState(0);
+  const [jsonView, setJsonView] = useState(false);
 
   const applyDecode = b => {
     if (autoTrim) {
@@ -74,12 +76,19 @@ function App() {
     }
   };
 
-  const result = hexBuffer ? (
-    <Fragment>
-      <Header as="h2">Result</Header>
-      <ProtobufDisplay value={decodeProto(hexBuffer, parseDelimited)} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
-    </Fragment>
-  ) : null;
+  const result = hexBuffer ? (() => {
+    const decoded = decodeProto(hexBuffer, parseDelimited);
+    return (
+      <Fragment>
+        <Header as="h2">Result</Header>
+        {jsonView ? (
+          <ProtobufJsonView value={decoded} originalBuffer={hexBuffer} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
+        ) : (
+          <ProtobufDisplay value={decoded} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
+        )}
+      </Fragment>
+    );
+  })() : null;
 
   return (
     <Container>
@@ -111,15 +120,11 @@ function App() {
           />
         </Form.Group>
         <Form.Group>
+
           <Checkbox
-            label="parse varint length delimited input"
-            data-testid="parse-delimited-checkbox"
-            onChange={(_, data) => {
-              setParseDelimited(!!data.checked);
-              const b = parseInput(hex);
-              applyDecode(b);
-            }}
-            checked={parseDelimited}
+            label="view result as JSON"
+            checked={jsonView}
+            onChange={(_, d) => setJsonView(!!d.checked)}
           />
         </Form.Group>
         <Form.Group>

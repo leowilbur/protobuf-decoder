@@ -135,14 +135,22 @@ export function decodeProto(buffer, parseDelimited) {
 }
 
 export function trimToDecodable(buffer, parseDelimited) {
+  let fallback = null;
   for (let i = 0; i < buffer.length; i++) {
     const b = buffer.slice(i);
     const r = decodeProto(b, parseDelimited);
     if (r.parts.length && r.leftOver.length === 0) {
-      return { buffer: b, offset: i };
+      if (!parseDelimited) {
+        return { buffer: b, offset: i };
+      }
+      const hasDelimiter = r.parts.some(p => p.type === TYPES.MSG_LEN_DELIMITER);
+      if (hasDelimiter) {
+        return { buffer: b, offset: i };
+      }
+      if (!fallback) fallback = { buffer: b, offset: i };
     }
   }
-  return { buffer, offset: 0 };
+  return fallback || { buffer, offset: 0 };
 }
 
 
