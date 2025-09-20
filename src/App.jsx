@@ -16,7 +16,7 @@ import { decodeProto, trimToDecodable } from "./protobufDecoder";
 
 function App() {
   const [hex, setHex] = useState("");
-  const [parseDelimited, setParseDelimited] = useState(false);
+
   const [hexBuffer, setHexBuffer] = useState("");
   const [trimOffset, setTrimOffset] = useState(0);
   const [trimCount, setTrimCount] = useState(0);
@@ -26,15 +26,16 @@ function App() {
   const [maxTrimChars, setMaxTrimChars] = useState(0);
   const [jsonView, setJsonView] = useState(false);
 
-  const applyDecode = b => {
-    if (autoTrim) {
-      const { buffer: t, offset: o } = trimToDecodable(b, parseDelimited);
+  const applyDecode = (b, at = autoTrim) => {
+    if (at) {
+      const { buffer: t, offset: o } = trimToDecodable(b, false);
       setHexBuffer(t);
       setTrimOffset(o);
       setTrimCount(o);
       setTrimHex(bufferToPrettyHex(b.slice(0, o)));
+      setTrimChars(o);
     } else {
-      const bytes = Math.min(Math.floor(trimChars / 2), b.length);
+      const bytes = Math.min(trimChars, b.length);
       const t = b.slice(bytes);
       setHexBuffer(t);
       setTrimOffset(bytes);
@@ -46,16 +47,12 @@ function App() {
   const onHexChanged = e => {
     const v = e.target.value;
     setHex(v);
-    const normalized = v.replace(/\s/g, "").replace(/0x/gi, "").toLowerCase();
-    const isHexInput = normalized.length > 0 && /^[0-9a-f]+$/.test(normalized);
-    const maxChars = isHexInput ? normalized.length : 0;
-    setMaxTrimChars(maxChars);
-    let tc = trimChars;
-    if (tc > maxChars) tc = maxChars;
-    if (tc % 2) tc -= 1;
-    if (tc !== trimChars) setTrimChars(tc);
-
     const b = parseInput(v);
+    setMaxTrimChars(b.length);
+    let tb = trimChars;
+    if (tb > b.length) tb = b.length;
+    if (tb < 0) tb = 0;
+    if (tb !== trimChars) setTrimChars(tb);
     applyDecode(b);
   };
 
@@ -66,25 +63,25 @@ function App() {
     if (file) {
       const b = new Uint8Array(await file.arrayBuffer());
       setHex(bufferToPrettyHex(b));
-      const max = b.length * 2;
+      const max = b.length;
       setMaxTrimChars(max);
-      let tc = trimChars;
-      if (tc > max) tc = max;
-      if (tc % 2) tc -= 1;
-      if (tc !== trimChars) setTrimChars(tc);
+      let tb = trimChars;
+      if (tb > max) tb = max;
+      if (tb < 0) tb = 0;
+      if (tb !== trimChars) setTrimChars(tb);
       applyDecode(b);
     }
   };
 
   const result = hexBuffer ? (() => {
-    const decoded = decodeProto(hexBuffer, parseDelimited);
+    const decoded = decodeProto(hexBuffer, false);
     return (
       <Fragment>
         <Header as="h2">Result</Header>
         {jsonView ? (
           <ProtobufJsonView value={decoded} originalBuffer={hexBuffer} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
         ) : (
-          <ProtobufDisplay value={decoded} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
+          <ProtobufDisplay value={decoded} originalBuffer={hexBuffer} baseOffset={trimOffset} trimCount={trimCount} trimHex={trimHex} />
         )}
       </Fragment>
     );
@@ -120,7 +117,6 @@ function App() {
           />
         </Form.Group>
         <Form.Group>
-
           <Checkbox
             label="view result as JSON"
             checked={jsonView}
@@ -132,9 +128,10 @@ function App() {
             label="auto trim"
             checked={autoTrim}
             onChange={(_, d) => {
-              setAutoTrim(!!d.checked);
+              const next = !!d.checked;
+              setAutoTrim(next);
               const b = parseInput(hex);
-              applyDecode(b);
+              applyDecode(b, next);
             }}
           />
           <div style={{ marginLeft: 16, flex: 1 }}>
@@ -142,22 +139,21 @@ function App() {
               type="number"
               min={0}
               max={maxTrimChars}
-              step={2}
+              step={1}
               value={trimChars}
-              disabled={autoTrim}
               onChange={e => {
+                if (autoTrim) setAutoTrim(false);
                 let v = parseInt(e.target.value || "0", 10);
                 if (isNaN(v)) v = 0;
-                if (v % 2) v -= 1;
                 if (v < 0) v = 0;
                 if (v > maxTrimChars) v = maxTrimChars;
                 setTrimChars(v);
                 const b = parseInput(hex);
-                applyDecode(b);
+                applyDecode(b, false);
               }}
               style={{ width: 160 }}
             />
-            <div>Trim left chars: {trimChars} / {maxTrimChars}</div>
+            <div>Bytes Trim: {trimChars} / {maxTrimChars}</div>
           </div>
         </Form.Group>
 

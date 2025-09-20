@@ -25,7 +25,7 @@ function splitDelimitedPartsInMessages(parts) {
 }
 
 function ProtobufDisplay(props) {
-  const { value, baseOffset = 0, trimCount = 0, trimHex = "" } = props;
+  const { value, baseOffset = 0, trimCount = 0, trimHex = "", originalBuffer } = props;
 
   const messages = splitDelimitedPartsInMessages(value.parts);
 
@@ -40,6 +40,7 @@ function ProtobufDisplay(props) {
           <Table.Header>
             <Table.Row>
               <Table.HeaderCell>Byte Range</Table.HeaderCell>
+              <Table.HeaderCell>Hex Data</Table.HeaderCell>
               <Table.HeaderCell>Field Number</Table.HeaderCell>
               <Table.HeaderCell>Type</Table.HeaderCell>
               <Table.HeaderCell>Content</Table.HeaderCell>
@@ -49,13 +50,14 @@ function ProtobufDisplay(props) {
             {i === 0 && trimCount > 0 ? (
               <Table.Row>
                 <Table.Cell>{`1-${trimCount}`}</Table.Cell>
-                <Table.Cell></Table.Cell>
-                <Table.Cell>trim</Table.Cell>
                 <Table.Cell>{trimHex}</Table.Cell>
+                <Table.Cell></Table.Cell>
+                <Table.Cell>Bytes Trim</Table.Cell>
+                <Table.Cell></Table.Cell>
               </Table.Row>
             ) : null}
             {messageParts.map((part, j) => (
-              <ProtobufPart key={`${i}-${j}`} part={part} baseOffset={baseOffset} />
+              <ProtobufPart key={`${i}-${j}`} part={part} baseOffset={baseOffset} originalBuffer={originalBuffer} />
             ))}
           </Table.Body>
         </Table>

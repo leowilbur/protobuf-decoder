@@ -8,6 +8,7 @@ import {
   decodeVarintParts
 } from "./protobufPartDecoder";
 import ProtobufDisplay from "./ProtobufDisplay";
+import { bufferToPrettyHex } from "./hexUtils";
 
 function ProtobufVarintPart(props) {
   const { value } = props;
@@ -55,7 +56,6 @@ function getProtobufPart(part) {
     case TYPES.VARINT:
       return [<ProtobufVarintPart value={part.value} />];
     case TYPES.LENDELIM:
-      // TODO: Support repeated field
       let decoded = decodeProto(part.value);
       if (part.value.length > 0 && decoded.leftOver.length === 0) {
         return [<ProtobufDisplay value={decoded} />, "protobuf"];
@@ -75,16 +75,20 @@ function getProtobufPart(part) {
 }
 
 function ProtobufPart(props) {
-  const { part, baseOffset = 0 } = props;
+  const { part, baseOffset = 0, originalBuffer } = props;
 
   const [contents, subType] = getProtobufPart(part);
   const stringType = typeToString(part.type, subType);
   const start = part.byteRange[0] + baseOffset;
   const end = part.byteRange[1] + baseOffset;
+  const hex = originalBuffer
+    ? bufferToPrettyHex(originalBuffer.slice(part.byteRange[0], part.byteRange[1]))
+    : "";
 
   return (
     <Table.Row>
       <Table.Cell>{`${start}-${end}`}</Table.Cell>
+      <Table.Cell>{hex}</Table.Cell>
       <Table.Cell>{part.index}</Table.Cell>
       <Table.Cell>{stringType}</Table.Cell>
       <Table.Cell>{contents}</Table.Cell>
