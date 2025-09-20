@@ -1,6 +1,6 @@
 import React from "react";
 import { bufferToPrettyHex } from "./hexUtils";
-import { TYPES, typeToString } from "./protobufDecoder";
+import { TYPES, typeToString, decodeProto } from "./protobufDecoder";
 import { decodeVarintParts, decodeFixed32, decodeFixed64, decodeStringOrBytes } from "./protobufPartDecoder";
 
 function convertPartToJson(part, originalBuffer, baseOffset = 0) {
@@ -24,26 +24,18 @@ function convertPartToJson(part, originalBuffer, baseOffset = 0) {
       });
       break;
 
-    case TYPES.LENDELIM:
-      try {
-        // Try to decode as protobuf first
-        const { decodeProto } = require("./protobufDecoder");
-        const decoded = decodeProto(part.value);
-        if (part.value.length > 0 && decoded.leftOver.length === 0) {
-          base.type = "protobuf";
-          base.content = convertToJson(decoded, part.value, 0);
-        } else {
-          // Decode as string or bytes
-          const stringDecoded = decodeStringOrBytes(part.value);
-          base.type = stringDecoded.type;
-          base.content = stringDecoded.value;
-        }
-      } catch (e) {
+    case TYPES.LENDELIM: {
+      const decoded = decodeProto(part.value);
+      if (part.value.length > 0 && decoded.leftOver.length === 0) {
+        base.type = "protobuf";
+        base.content = convertToJson(decoded, part.value, 0);
+      } else {
         const stringDecoded = decodeStringOrBytes(part.value);
         base.type = stringDecoded.type;
         base.content = stringDecoded.value;
       }
       break;
+    }
 
     case TYPES.FIXED32:
       const fixed32Decoded = decodeFixed32(part.value);
